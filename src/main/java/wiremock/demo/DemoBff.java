@@ -1,7 +1,10 @@
 package wiremock.demo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.squareup.okhttp.*;
+import com.squareup.okhttp.MediaType;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.RequestBody;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.json.JavalinJackson;
@@ -49,10 +52,14 @@ public class DemoBff {
                         .build())
                 .execute();
 
-        ChargeResponse chargeResponse = objectMapper.readValue(response.body().bytes(), ChargeResponse.class);
-
-        ctx.status(201);
-        ctx.json(new PaymentResult(chargeResponse.status()));
+        if (response.isSuccessful()) {
+            ChargeResponse chargeResponse = objectMapper.readValue(response.body().bytes(), ChargeResponse.class);
+            ctx.status(201);
+            ctx.json(new PaymentResult(chargeResponse.status()));
+        } else if (response.code() >= 500) {
+            ctx.status(500);
+            ctx.json(new PaymentResult("Payment service error"));
+        }
     }
 
     private byte[] toJson(Object obj) {

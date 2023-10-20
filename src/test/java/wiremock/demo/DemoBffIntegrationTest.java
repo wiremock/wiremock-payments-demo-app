@@ -1,5 +1,6 @@
 package wiremock.demo;
 
+import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import io.restassured.RestAssured;
@@ -16,6 +17,7 @@ import static org.hamcrest.Matchers.is;
 public class DemoBffIntegrationTest {
 
     static DemoBff demoBff;
+    static WireMock mockPaymentService;
 
     @BeforeAll
     static void init(WireMockRuntimeInfo wireMockRuntimeInfo) {
@@ -23,12 +25,12 @@ public class DemoBffIntegrationTest {
         demoBff.start();
         RestAssured.enableLoggingOfRequestAndResponseIfValidationFails();
         RestAssured.baseURI = "http://localhost:" + demoBff.getPort();
+
+        mockPaymentService = wireMockRuntimeInfo.getWireMock();
     }
 
     @Test
-    void successfully_pay_for_product(WireMockRuntimeInfo wireMockRuntimeInfo) {
-        var mockPaymentService = wireMockRuntimeInfo.getWireMock();
-
+    void successfully_pay_for_product() {
         mockPaymentService.register(post(urlPathEqualTo("/charges"))
             .willReturn(okJson("""
                 {
@@ -58,5 +60,27 @@ public class DemoBffIntegrationTest {
                 postRequestedFor(urlPathEqualTo("/charges"))
                         .withRequestBody(matchingJsonPath("$.amount", equalTo("33")))
         );
+    }
+
+    @Test
+    void api_error() {
+        mockPaymentService.register(post(urlPathEqualTo("/charges"))
+                .willReturn(serviceUnavailable()));
+
+        given()
+                .body("""
+                    {
+                      "customerId": "1234567890",
+                      "productId": "12eb9101-6cd5-4378-8283-8924a64ddb05",
+                      "quantity": 3,
+                      "currency": "GBP"
+                    }
+                    """)
+                .contentType("application/json")
+                .when()
+                .post("/payments")
+                .then()
+                .statusCode(500)
+                .body("status", is("Payment service error"));
     }
 }
