@@ -33,7 +33,7 @@ public class DemoBff {
     void start() {
         webapp = Javalin.create(config -> config.jsonMapper(new JavalinJackson()))
                 .post("/payments", this::handleCreatePayment)
-                .start();
+                .start(0);
     }
 
     private void handleCreatePayment(Context ctx) throws IOException {

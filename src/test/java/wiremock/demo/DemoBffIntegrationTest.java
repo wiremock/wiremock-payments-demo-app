@@ -29,14 +29,13 @@ public class DemoBffIntegrationTest {
     void successfully_pay_for_product(WireMockRuntimeInfo wireMockRuntimeInfo) {
         var mockPaymentService = wireMockRuntimeInfo.getWireMock();
 
-        var chargeId = UUID.randomUUID().toString();
         mockPaymentService.register(post(urlPathEqualTo("/charges"))
             .willReturn(okJson("""
                 {
                     "status": "OK",
                     "chargeId": "%s"
                 }
-                """.formatted(chargeId))
+                """.formatted(UUID.randomUUID()))
             ));
 
         given()
@@ -54,5 +53,10 @@ public class DemoBffIntegrationTest {
                 .then()
                 .statusCode(201)
                 .body("status", is("OK"));
+
+        mockPaymentService.verifyThat(
+                postRequestedFor(urlPathEqualTo("/charges"))
+                        .withRequestBody(matchingJsonPath("$.amount", equalTo("33")))
+        );
     }
 }
