@@ -1,6 +1,7 @@
 package wiremock.demo;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import io.restassured.RestAssured;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.is;
 
@@ -85,5 +87,28 @@ public class DemoBffIntegrationTest {
                 .then()
                 .statusCode(500)
                 .body("status", is("Payment service error"));
+    }
+
+    @Test
+    void network_error() {
+        mockPaymentService.register(post(urlPathEqualTo("/charges"))
+                .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER)));
+
+        given()
+                // language=JSON
+                .body("""
+                    {
+                      "customerId": "1234567890",
+                      "productId": "12eb9101-6cd5-4378-8283-8924a64ddb05",
+                      "quantity": 3,
+                      "currency": "GBP"
+                    }
+                    """)
+                .contentType("application/json")
+                .when()
+                .post("/payments")
+                .then()
+                .statusCode(500)
+                .body("status", is("Payment service fault"));
     }
 }

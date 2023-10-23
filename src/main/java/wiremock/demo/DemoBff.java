@@ -1,10 +1,7 @@
 package wiremock.demo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.squareup.okhttp.MediaType;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.RequestBody;
+import com.squareup.okhttp.*;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.json.JavalinJackson;
@@ -46,11 +43,18 @@ public class DemoBff {
 
         var chargeRequest = new ChargeRequest(productPaymentRequest.customerId(), total, productPaymentRequest.currency());
 
-        var response = httpClient.newCall(new Request.Builder()
-                        .url(paymentsApiBaseUrl + "/charges")
-                        .post(RequestBody.create(MediaType.parse("application/json"), toJson(chargeRequest)))
-                        .build())
-                .execute();
+        Response response;
+        try {
+            response = httpClient.newCall(new Request.Builder()
+                            .url(paymentsApiBaseUrl + "/charges")
+                            .post(RequestBody.create(MediaType.parse("application/json"), toJson(chargeRequest)))
+                            .build())
+                    .execute();
+        } catch (IOException e) {
+            ctx.status(500);
+            ctx.json(new PaymentResult("Payment service fault"));
+            return;
+        }
 
         if (response.isSuccessful()) {
             ChargeResponse chargeResponse = objectMapper.readValue(response.body().bytes(), ChargeResponse.class);
