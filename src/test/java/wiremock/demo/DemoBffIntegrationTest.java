@@ -1,9 +1,9 @@
 package wiremock.demo;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import io.restassured.RestAssured;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -12,6 +12,8 @@ import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER;
+import static com.github.tomakehurst.wiremock.http.Fault.EMPTY_RESPONSE;
+import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.is;
 
@@ -110,5 +112,54 @@ public class DemoBffIntegrationTest {
                 .then()
                 .statusCode(500)
                 .body("status", is("Payment service fault"));
+    }
+
+    @Test
+    void retries_payment_when_on_error_and_fault() {
+        // First a proxy error
+        mockPaymentService.register(post(urlPathEqualTo("/charges"))
+                .inScenario("fail-twice-then-succeed")
+                .whenScenarioStateIs(STARTED)
+                .willSetStateTo("second-failure")
+                .willReturn(aResponse().withStatus(502))
+        );
+
+        // Then a network fault
+        mockPaymentService.register(post(urlPathEqualTo("/charges"))
+                .inScenario("fail-twice-then-succeed")
+                .whenScenarioStateIs("first-failure")
+                .willSetStateTo("success")
+                .willReturn(aResponse().withFault(EMPTY_RESPONSE))
+        );
+
+        // Then succeed
+        mockPaymentService.register(post(urlPathEqualTo("/charges"))
+                .inScenario("fail-twice-then-succeed")
+                .whenScenarioStateIs("success")
+                // language=JSON
+                .willReturn(okJson("""
+                {
+                    "status": "OK",
+                    "chargeId": "%s"
+                }
+                """.formatted(UUID.randomUUID()))
+                ));
+
+        given()
+                // language=JSON
+                .body("""
+                    {
+                      "customerId": "1234567890",
+                      "productId": "12eb9101-6cd5-4378-8283-8924a64ddb05",
+                      "quantity": 3,
+                      "currency": "GBP"
+                    }
+                    """)
+                .contentType("application/json")
+                .when()
+                .post("/payments")
+                .then()
+                .statusCode(201)
+                .body("status", is("OK"));
     }
 }
