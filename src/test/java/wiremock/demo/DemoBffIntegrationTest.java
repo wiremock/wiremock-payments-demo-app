@@ -32,7 +32,8 @@ public class DemoBffIntegrationTest {
     @Test
     void successfully_pay_for_product() {
         mockPaymentService.register(post(urlPathEqualTo("/charges"))
-            .willReturn(okJson("""
+                // language=JSON
+                .willReturn(okJson("""
                 {
                     "status": "OK",
                     "chargeId": "%s"
@@ -41,6 +42,7 @@ public class DemoBffIntegrationTest {
             ));
 
         given()
+                // language=JSON
                 .body("""
                     {
                       "customerId": "1234567890",
@@ -68,6 +70,7 @@ public class DemoBffIntegrationTest {
                 .willReturn(serviceUnavailable()));
 
         given()
+                // language=JSON
                 .body("""
                     {
                       "customerId": "1234567890",
