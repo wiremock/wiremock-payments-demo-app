@@ -3,7 +3,6 @@ package wiremock.demo;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
-import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import io.restassured.RestAssured;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -120,7 +119,7 @@ public class DemoBffIntegrationTest {
         mockPaymentService.register(post(urlPathEqualTo("/charges"))
                 .inScenario("fail-twice-then-succeed")
                 .whenScenarioStateIs(STARTED)
-                .willSetStateTo("second-failure")
+                .willSetStateTo("first-failure")
                 .willReturn(aResponse().withStatus(502))
         );
 

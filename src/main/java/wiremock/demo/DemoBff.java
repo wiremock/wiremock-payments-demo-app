@@ -2,6 +2,8 @@ package wiremock.demo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.okhttp.*;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.json.JavalinJackson;
@@ -36,13 +38,26 @@ public class DemoBff {
                 .start(0);
     }
 
-    private void handleCreatePayment(Context ctx) throws IOException {
+    private void handleCreatePayment(Context ctx) {
         var productPaymentRequest = ctx.bodyAsClass(ProductPaymentRequest.class);
         var price = productCatalogue.getPrice(productPaymentRequest.productId(), productPaymentRequest.currency());
         var total = price * productPaymentRequest.quantity();
 
-        var chargeRequest = new ChargeRequest(productPaymentRequest.customerId(), total, productPaymentRequest.currency());
+        ChargeRequest chargeRequest = new ChargeRequest(productPaymentRequest.customerId(), total, productPaymentRequest.currency());
 
+        try {
+            ChargeResponse chargeResponse =
+                    Retry.of("payment-service", RetryConfig.custom().maxAttempts(3).build())
+                    .executeCallable(() -> executePaymentRequest(chargeRequest));
+            ctx.status(201);
+            ctx.json(new PaymentResult(chargeResponse.status()));
+        } catch (Exception e) {
+            ctx.status(500);
+            ctx.json(new PaymentResult(e.getMessage()));
+        }
+    }
+
+    private ChargeResponse executePaymentRequest(ChargeRequest chargeRequest) throws IOException {
         Response response;
         try {
             response = httpClient.newCall(new Request.Builder()
@@ -51,19 +66,14 @@ public class DemoBff {
                             .build())
                     .execute();
         } catch (IOException e) {
-            ctx.status(500);
-            ctx.json(new PaymentResult("Payment service fault"));
-            return;
+            throw new IOException("Payment service fault");
         }
 
         if (response.isSuccessful()) {
-            ChargeResponse chargeResponse = objectMapper.readValue(response.body().bytes(), ChargeResponse.class);
-            ctx.status(201);
-            ctx.json(new PaymentResult(chargeResponse.status()));
-        } else if (response.code() >= 500) {
-            ctx.status(500);
-            ctx.json(new PaymentResult("Payment service error"));
+            return objectMapper.readValue(response.body().bytes(), ChargeResponse.class);
         }
+
+        throw new IOException("Payment service error");
     }
 
     private byte[] toJson(Object obj) {
