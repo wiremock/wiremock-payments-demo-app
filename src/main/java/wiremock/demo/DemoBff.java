@@ -24,10 +24,6 @@ public class DemoBff {
 
     private Javalin webapp;
 
-    public DemoBff() {
-        this("https://payments.example.com");
-    }
-
     public DemoBff(String paymentsApiBaseUrl) {
         this.paymentsApiBaseUrl = paymentsApiBaseUrl;
     }
@@ -82,9 +78,5 @@ public class DemoBff {
 
     public int getPort() {
         return webapp.port();
-    }
-
-    public static void main(String[] args) {
-        new DemoBff().start();
     }
 }
