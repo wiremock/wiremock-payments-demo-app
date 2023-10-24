@@ -1,6 +1,7 @@
 package wiremock.demo;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import io.restassured.RestAssured;
 import org.junit.jupiter.api.BeforeAll;
@@ -122,6 +123,28 @@ public class DemoBffGrpcIntegrationTest {
 
         wm.verify(postRequestedFor(urlPathEqualTo("/" + PaymentServiceGrpc.SERVICE_NAME + "/createCharge"))
                 .withRequestBody(matchingJsonPath("$.amount", equalTo("33"))));
+    }
+
+    @Test
+    void grpc_network_fault() {
+        wm.stubFor(post(urlPathEqualTo("/" + PaymentServiceGrpc.SERVICE_NAME + "/createCharge"))
+                        .willReturn(aResponse().withFault(Fault.EMPTY_RESPONSE)));
+
+        given()
+                // language=JSON
+                .body("""
+                    {
+                      "customerId": "1234567890",
+                      "productId": "12eb9101-6cd5-4378-8283-8924a64ddb05",
+                      "quantity": 3,
+                      "currency": "GBP"
+                    }
+                    """)
+                .contentType("application/json")
+                .when()
+                .post("/payments")
+                .then()
+                .statusCode(500);
     }
 
 
